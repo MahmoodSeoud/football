@@ -24,7 +24,12 @@ fi
 # TODO: Try importing psutil and if failed fall back to 1 thread
 PARALLELISM=$(python3 -c 'import psutil; import multiprocessing as mp; print(int(max(1,min((psutil.virtual_memory().available/1000000000-1)/0.5, mp.cpu_count()))))')
 
-# Delete pre-existing version of CMakeCache.txt to make 'python3 -m pip install' work.
-rm -f third_party/gfootball_engine/CMakeCache.txt
-pushd third_party/gfootball_engine && cmake . && make -j $PARALLELISM && popd
+# Skip build if library already exists
+if [ -f "third_party/gfootball_engine/libgame.$LIB_EXTENSION" ]; then
+    echo "Skipping build - library already exists"
+else
+    # Delete pre-existing version of CMakeCache.txt to make 'python3 -m pip install' work.
+    rm -f third_party/gfootball_engine/CMakeCache.txt
+    pushd third_party/gfootball_engine && cmake . && make -j $PARALLELISM && popd
+fi
 pushd third_party/gfootball_engine && ln -sf libgame.$LIB_EXTENSION _gameplayfootball.so && popd

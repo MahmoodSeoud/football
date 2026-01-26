@@ -27,3 +27,16 @@ cmake_install.cmake
 # IDE
 .idea
 .vs*
+
+# CornerTactics data (too large for git)
+CornerTactics/grf/data/raw*/
+CornerTactics/grf/data/processed*/*.csv
+CornerTactics/logs/
+CornerTactics/grf/data/videos/*.dump
+CornerTactics/grf/data/videos/*.avi
+
+# Build artifacts
+gfootball_engine
+third_party/gfootball_engine/fonts/
+*.so
+*.o

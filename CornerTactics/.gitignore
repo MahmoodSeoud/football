@@ -1,0 +1,40 @@
+# Data files (too large for git)
+grf/data/raw_11v11/
+grf/data/raw/
+grf/data/processed_11v11/*.csv
+grf/data/processed/*.csv
+*.json
+!grf/data/processed_11v11/feature_info.json
+!grf/data/processed/feature_info.json
+
+# Keep metadata
+!**/collection_*_metadata.json
+!**/feature_info.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+
+# Results (keep structure, ignore large files)
+results_11v11/*.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test data
+grf/data/raw_11v11_test/
+grf/data/processed_11v11_test/

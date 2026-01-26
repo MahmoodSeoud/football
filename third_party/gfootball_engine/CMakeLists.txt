@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.5)
 
 if(WIN32)
   # Check for required Environment variables
@@ -36,7 +36,7 @@ set(CMAKE_CXX_STANDARD 14)
 if(UNIX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS} -fPIC -g -O3")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -O3 -g")
-  set(OpenGL_GL_PREFERENCE GLVND)
+  set(OpenGL_GL_PREFERENCE LEGACY)
 endif(UNIX)
 
 # Find required libraries
