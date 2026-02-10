@@ -12,26 +12,15 @@ from pathlib import Path
 # Add models directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import existing functions
 from models.receiver_model import (
     majority_class_baseline,
     nearest_player_baseline,
+    frequency_weighted_baseline,
+    baseline_topk_accuracy,
+    evaluate_all_baselines,
 )
 
-# Import new functions (may not exist yet - TDD Red phase)
-try:
-    from models.receiver_model import frequency_weighted_baseline
-except ImportError:
-    frequency_weighted_baseline = None
 
-try:
-    from models.receiver_model import baseline_topk_accuracy
-except ImportError:
-    baseline_topk_accuracy = None
-
-
-@pytest.mark.skipif(frequency_weighted_baseline is None,
-                    reason="frequency_weighted_baseline not implemented yet")
 class TestFrequencyWeightedBaseline:
     """Tests for frequency_weighted_baseline function."""
 
@@ -77,8 +66,6 @@ class TestFrequencyWeightedBaseline:
         assert not np.array_equal(preds1, preds2)
 
 
-@pytest.mark.skipif(baseline_topk_accuracy is None,
-                    reason="baseline_topk_accuracy not implemented yet")
 class TestBaselineTopkAccuracy:
     """Tests for baseline_topk_accuracy function."""
 
@@ -180,3 +167,62 @@ class TestExistingBaselines:
         assert preds[0] == 0
         assert preds[1] == 5
         assert preds[2] == 21
+
+
+class TestEvaluateAllBaselines:
+    """Tests for evaluate_all_baselines function."""
+
+    def test_returns_expected_keys(self):
+        """Result should contain all baseline metrics."""
+        train_labels = np.array([0, 0, 1, 1, 2, 2, 5, 5, 10, 10])
+        test_labels = np.array([0, 1, 2, 5, 10])
+        test_node_features = np.zeros((5, 23, 8))
+
+        # Set positions so player 0 is always closest to ball
+        for i in range(5):
+            for p in range(22):
+                test_node_features[i, p, 0:2] = [10.0, 10.0]
+            test_node_features[i, 0, 0:2] = [0.0, 0.0]
+            test_node_features[i, 22, 0:2] = [0.0, 0.0]
+
+        result = evaluate_all_baselines(train_labels, test_labels, test_node_features)
+
+        # Check expected keys
+        assert 'majority_class' in result
+        assert 'freq_weighted' in result
+        assert 'nearest_player' in result
+        assert 'uniform_random' in result
+
+        # Each baseline should have top-1, top-3, top-5
+        for baseline in ['majority_class', 'freq_weighted', 'uniform_random']:
+            assert 'top1' in result[baseline]
+            assert 'top3' in result[baseline]
+            assert 'top5' in result[baseline]
+
+        # Nearest player only has top-1
+        assert 'top1' in result['nearest_player']
+
+    def test_uniform_random_values(self):
+        """Uniform random baseline should have theoretical values."""
+        train_labels = np.array([0, 1, 2])
+        test_labels = np.array([0, 1])
+        test_node_features = np.zeros((2, 23, 8))
+
+        result = evaluate_all_baselines(train_labels, test_labels, test_node_features)
+
+        # Theoretical values for uniform random with 23 classes
+        assert result['uniform_random']['top1'] == pytest.approx(1/23, abs=0.001)
+        assert result['uniform_random']['top3'] == pytest.approx(3/23, abs=0.001)
+        assert result['uniform_random']['top5'] == pytest.approx(5/23, abs=0.001)
+
+    def test_majority_class_top1_correct(self):
+        """Majority class top-1 should match direct accuracy calculation."""
+        train_labels = np.array([5, 5, 5, 5, 10, 10])  # Class 5 is majority
+        test_labels = np.array([5, 5, 10, 15, 20])
+        test_node_features = np.zeros((5, 23, 8))
+
+        result = evaluate_all_baselines(train_labels, test_labels, test_node_features)
+
+        # Majority class is 5, which matches 2 out of 5 test labels
+        expected_acc = 2/5
+        assert result['majority_class']['top1'] == pytest.approx(expected_acc)

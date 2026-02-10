@@ -372,6 +372,97 @@ def baseline_topk_accuracy(train_labels, test_labels, k=3):
     return float(np.mean([label in top_k_classes for label in test_labels]))
 
 
+def evaluate_all_baselines(train_labels, test_labels, test_node_features, seed=42):
+    """
+    Evaluate all baseline methods and return comprehensive metrics.
+
+    Args:
+        train_labels: Training set receiver labels (0-22).
+        test_labels: Test set receiver labels (0-22).
+        test_node_features: (N, 23, features) array of test set node features.
+        seed: Random seed for frequency-weighted baseline.
+
+    Returns:
+        Dict with metrics for each baseline:
+        - majority_class: top1, top3, top5
+        - freq_weighted: top1, top3, top5
+        - nearest_player: top1
+        - uniform_random: top1, top3, top5 (theoretical)
+    """
+    n_test = len(test_labels)
+
+    # Majority class baseline
+    majority_preds = majority_class_baseline(train_labels, n_test)
+    majority_top1 = float((majority_preds == test_labels).mean())
+    majority_top3 = baseline_topk_accuracy(train_labels, test_labels, k=3)
+    majority_top5 = baseline_topk_accuracy(train_labels, test_labels, k=5)
+
+    # Frequency-weighted baseline
+    freq_preds = frequency_weighted_baseline(train_labels, n_test, seed=seed)
+    freq_top1 = float((freq_preds == test_labels).mean())
+    freq_top3 = baseline_topk_accuracy(train_labels, test_labels, k=3)
+    freq_top5 = baseline_topk_accuracy(train_labels, test_labels, k=5)
+
+    # Nearest player baseline
+    nearest_preds = nearest_player_baseline(test_node_features)
+    nearest_top1 = float((nearest_preds == test_labels).mean())
+
+    # Uniform random baseline (theoretical values)
+    n_classes = 23
+    uniform_top1 = 1.0 / n_classes
+    uniform_top3 = 3.0 / n_classes
+    uniform_top5 = 5.0 / n_classes
+
+    return {
+        'majority_class': {
+            'top1': majority_top1,
+            'top3': majority_top3,
+            'top5': majority_top5,
+        },
+        'freq_weighted': {
+            'top1': freq_top1,
+            'top3': freq_top3,
+            'top5': freq_top5,
+        },
+        'nearest_player': {
+            'top1': nearest_top1,
+        },
+        'uniform_random': {
+            'top1': uniform_top1,
+            'top3': uniform_top3,
+            'top5': uniform_top5,
+        },
+    }
+
+
+def print_baseline_table(baselines):
+    """
+    Print a formatted table of baseline results.
+
+    Args:
+        baselines: Dict from evaluate_all_baselines().
+    """
+    print("\n--- Baselines ---")
+    print(f"{'':18s} {'Top-1':>7s} {'Top-3':>7s} {'Top-5':>7s}")
+    print("-" * 42)
+
+    # Majority class
+    mc = baselines['majority_class']
+    print(f"{'Majority class':18s} {mc['top1']:7.3f} {mc['top3']:7.3f} {mc['top5']:7.3f}")
+
+    # Frequency-weighted
+    fw = baselines['freq_weighted']
+    print(f"{'Freq-weighted':18s} {fw['top1']:7.3f} {fw['top3']:7.3f} {fw['top5']:7.3f}")
+
+    # Nearest player (only top-1)
+    np_base = baselines['nearest_player']
+    print(f"{'Nearest player':18s} {np_base['top1']:7.3f} {'N/A':>7s} {'N/A':>7s}")
+
+    # Uniform random
+    ur = baselines['uniform_random']
+    print(f"{'Uniform random':18s} {ur['top1']:7.3f} {ur['top3']:7.3f} {ur['top5']:7.3f}")
+
+
 # ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
@@ -629,26 +720,16 @@ def train_receiver(data_dir, output_dir, model_type='gat', epochs=150,
         print(f"    {label}: {cm[i][0]:5d} {cm[i][1]:5d} {cm[i][2]:5d}")
 
     # Run baselines on test set
-    print("\n--- Baselines ---")
     test_data = np.load(data_path / 'test.npz')
     test_node_features = test_data['node_features']
     test_receiver_labels = test_data['receiver_labels']
-
-    # Nearest-player baseline
-    nearest_preds = nearest_player_baseline(test_node_features)
-    nearest_acc = float((nearest_preds == test_receiver_labels).mean())
-    print(f"  Nearest-player top-1: {nearest_acc:.3f}")
-
-    # Majority-class baseline
     train_data = np.load(data_path / 'train.npz')
-    majority_preds = majority_class_baseline(train_data['receiver_labels'],
-                                              len(test_receiver_labels))
-    majority_acc = float((majority_preds == test_receiver_labels).mean())
-    print(f"  Majority-class top-1: {majority_acc:.3f}")
+    train_receiver_labels = train_data['receiver_labels']
 
-    # Random baseline
-    random_acc = 1.0 / 23
-    print(f"  Random baseline top-1: {random_acc:.3f}")
+    baselines = evaluate_all_baselines(
+        train_receiver_labels, test_receiver_labels, test_node_features
+    )
+    print_baseline_table(baselines)
 
     # Save results
     results = {
@@ -657,11 +738,7 @@ def train_receiver(data_dir, output_dir, model_type='gat', epochs=150,
         'best_epoch': best_epoch,
         'best_val_top1': best_val_acc,
         'test_metrics': test_metrics,
-        'baselines': {
-            'nearest_player_top1': nearest_acc,
-            'majority_class_top1': majority_acc,
-            'random_top1': random_acc,
-        },
+        'baselines': baselines,
         'history': history,
         'hyperparameters': {
             'epochs': epochs,
